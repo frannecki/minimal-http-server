@@ -9,25 +9,24 @@ const int MAXPOSTLEN = 1000;
 const int MAXTEXTLEN = 200;
 
 
-int loop_task(void* ptr){
+int loop_task(int fd){
     int ret;
     int recvlen;
-    char* filename;
-    char* argvlist;
-    char resp_header[MAXHEADERLEN];
-    char req_header[MAXHEADERLEN];
-    char req_text[MAXTEXTLEN];
+    char* filename;     // static file to transfer or cgi binary to execute
+    char* query_str;     // the query string for cgi, in POST content or GET url
+    char resp_header[MAXHEADERLEN];     // response header
+    char req_header[MAXHEADERLEN];      // request header
+    char req_text[MAXTEXTLEN];      // request content
     char method[MAXMETVERLEN];
     char uri[MAXURILEN];
     char version[MAXMETVERLEN];
-    char* const environs[] = {NULL};
-    char* emptylist[] = {NULL, NULL, NULL};
-    char filetype[MAXFILETYPELEN];
-    char resp_status[MAXSTATUSLEN];
-    char request[MAXPOSTLEN];
+    char* const environs[] = {NULL};        // environ list for cgi executables
+    char* argvlist[] = {NULL, NULL, NULL};      // argv list for cgi executables
+    char filetype[MAXFILETYPELEN];      // static file type
+    char resp_status[MAXSTATUSLEN];     // http request status
+    char request[MAXPOSTLEN];       // the complete request, including method, uri, http version, header and content
     char tmp[30];
-    char mainpage[] = "index.html";
-    int fd = *(int*)ptr;
+    char mainpage[] = "index.html";     // default page to direct to
 
     bzero(request, MAXPOSTLEN);
     if((recvlen = recv(fd, request, MAXPOSTLEN, 0)) < 0){
@@ -36,46 +35,47 @@ int loop_task(void* ptr){
         return -1;
     }
     else if(recvlen == 0){
-        fprintf(stdout, "Client aborted connection\n.");
+        fprintf(stdout, "Client aborted connection.\n");
         close(fd);
         return -4;
     }
-    //fprintf(stdout, "HTTP Request: %s\n", request);
+    
     sscanf(request, "%s %s %s", method, uri, version);
-    fprintf(stdout, "Request: %s %s %s\n", method, uri, version);
+    //fprintf(stdout, "Request: %s %s %s\n", method, uri, version);
     if(strlen(uri) == 0 || uri[0] != '/'){
         fprintf(stderr, "Invalid! URI mustn't be empty and should start with a '/'.\n");
         close(fd);
         return -2;
     }
-    if(0 == strcmp(method, "GET")){
-        if((ret = parse_uri_get(uri, mainpage, &filename, &argvlist)) == 0){
+    if(0 == strcasecmp(method, "GET")){
+        // GET method
+        if((ret = parse_uri_get(uri, mainpage, &filename, &query_str)) == 0){
             // static;
-            if(0 == send_static_content(fd, filename, resp_status, resp_header, filetype, 1)){
-                //fprintf(stdout, "Static served: %s\n", filename);
-            }
-            else{
+            if(transfer_static_file(fd, filename, resp_status, resp_header, filetype, 1)){
                 fprintf(stderr, "Error while serving static: %s\n\n", filename);
             }
         }
         else if(ret == 1){
             // dynamic
-            send_dynamic_content(fd, filename, argvlist, resp_status, emptylist, environs);
+            execute_cgi_bin(fd, filename, query_str, resp_status, argvlist, environs);
         }
     }
-    else if(0 == strcmp(method, "POST")){
+    else if(0 == strcasecmp(method, "POST")){
+        // POST method
         int offset1 = find_str_kmp(request, "\r\n");        // end of Method-Get-Version
         int offset2 = find_str_kmp(request, "\r\n\r\n");    // end of request header
         sscanf(request, "%s %s %s\n", method, uri, version);
         snprintf(req_header, offset2-offset1-3+1, "%s", request+offset1+3);
         sscanf(request+offset2+4, "%[^\a]", req_text);
         fprintf(stdout, "Request Text: %s\n", req_text);
-        send_dynamic_content(fd, uri+1, req_text, resp_header, emptylist, environs);
+        execute_cgi_bin(fd, uri+1, req_text, resp_header, argvlist, environs);
     }
     else if(0 == strcmp(method, "HEAD")){
-        send_static_content(fd, uri+1, resp_header, resp_header, filetype, 0);
+        // HEAD method
+        transfer_static_file(fd, uri+1, resp_header, resp_header, filetype, 0);
     }
     else{
+        // 400 bad request
         fprintf(stderr, "The method '%s' is not currently supported.\n", method);
         sprintf(resp_status, "HTTP/1.0 400 Bad Request\n");
         write(fd, resp_status, strlen(resp_status));
@@ -88,14 +88,15 @@ int loop_task(void* ptr){
 }
 
 
-int send_static_content(int fd, const char* filename, char* resp_status, 
+int transfer_static_file(int fd, const char* filename, char* resp_status, 
     char* resp_header, char* filetype, unsigned char method_get)
 {
     int filefd;
     int filesize;
     void* mmfd;
     struct stat st;
-    char tmp[50];    // set size 30 will cause stack overflow (stack smashing error)
+    char tmp[50];    
+    // set size 30 will cause stack overflow (stack smashing error)
     if(stat(filename,&st)==0){
         filesize = st.st_size;
     }
@@ -121,6 +122,9 @@ int send_static_content(int fd, const char* filename, char* resp_status,
     }
     else if(!endswithstr(filename, ".png")){
         strcpy(filetype, "image/png");
+    }
+    else if(!endswithstr(filename, ".webp")){
+        strcpy(filetype, "image/webp");
     }
     else if(!endswithstr(filename, ".gif")){
         strcpy(filetype, "image/gif");
@@ -166,13 +170,13 @@ int send_static_content(int fd, const char* filename, char* resp_status,
 }
 
 
-int send_dynamic_content(int fd, char* filename, char* args, char* resp_header, char** emptylist, 
-        char* const environs[])
+int execute_cgi_bin(int fd, char* filename, char* query, 
+        char* resp_header, char** argvlist, char* const environs[])
 {
     char tmp[30];
     int pid;
-    emptylist[0] = filename;
-    emptylist[1] = (strlen(args)>0)?args:NULL;
+    argvlist[0] = filename;
+    argvlist[1] = (strlen(query)>0)?query:NULL;
     strcpy(resp_header, "HTTP/1.0 200 OK\r\nConnection: close\r\nServer: TWS\r\nContent-Type: text/plain\r\n\r\n");
     write(fd, resp_header, strlen(resp_header));
     if((pid = fork()) < 0){
@@ -181,7 +185,7 @@ int send_dynamic_content(int fd, char* filename, char* args, char* resp_header, 
     }
     else if(pid == 0){
         dup2(fd, STDOUT_FILENO);
-        execve(filename, emptylist, environs);
+        execve(filename, argvlist, environs);
         exit(0);
     }
     else{

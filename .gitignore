@@ -1,5 +1,7 @@
 /bin
 /cgi-bin
 /files
+/backup
 *.ico
+*.log
 /webpages/example

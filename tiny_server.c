@@ -3,10 +3,12 @@
 
 
 int main(int argc, char **argv){
+    const int MAXEPOLL = 5;
     struct addrinfo *result;
     struct addrinfo *p;
     struct addrinfo hints;
     int serverfd;
+    int clientfd;
     int optval = 1;
     socklen_t size;
     struct threadpool_t thpool;
@@ -51,15 +53,11 @@ int main(int argc, char **argv){
     }
 
     while(1){
-        int clientfd;
         if((clientfd = accept(serverfd, p->ai_addr, &size)) < 0){
             perror("accept()");
             return 0;
         }
-        //while(loopTask(clientfd) == 0);
-        threadpool_assign_task(&thpool, &loop_task, (void*)&clientfd);
-        //loop_task(clientfd);
-        //close(clientfd);
+        threadpool_assign_task(&thpool, &loop_task, clientfd);
     }
     
     close(serverfd);

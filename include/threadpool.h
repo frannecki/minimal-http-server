@@ -20,11 +20,11 @@ enum THREADSTATUS{
 };
 
 //typedef void(*thread_fun_t)(void);
-typedef int(*thread_fun_t)(void*);
+typedef int(*thread_fun_t)(int);
 
 typedef struct thread_fun_var_t{
     thread_fun_t func; 
-    void* args;
+    int args;
 }thread_fun_var_t;
 
 struct thread_task_t{
@@ -48,7 +48,7 @@ int threadpool_create(struct threadpool_t*, int);
 
 static void* threadpool_dowork(void*);
 
-int threadpool_assign_task(struct threadpool_t*, thread_fun_t, void*);
+int threadpool_assign_task(struct threadpool_t*, thread_fun_t, int);
 
 int threadpool_stop(struct threadpool_t*);
 

@@ -23,7 +23,7 @@ int threadpool_create(struct threadpool_t* pool, int maxnum){
 static void* threadpool_dowork(void* param){
     struct threadpool_t* pool = (struct threadpool_t*)param;
     thread_fun_t task;
-    void* args;
+    int args;
     unsigned char newtask;
     for(;;){
         pthread_mutex_lock(&(pool->mtx));
@@ -47,7 +47,7 @@ static void* threadpool_dowork(void* param){
 }
 
 
-int threadpool_assign_task(struct threadpool_t* pool, thread_fun_t task, void* args){
+int threadpool_assign_task(struct threadpool_t* pool, thread_fun_t task, int args){
     pthread_mutex_lock(&(pool->mtx));
     if(pool->stopped){
         return THREAD_FINISHED;

@@ -11,6 +11,7 @@ extern "C"{
 #include <sys/wait.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+//#include <sys/epoll.h>
 #include <netdb.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -21,11 +22,11 @@ extern "C"{
 }
 #endif
 
-int loop_task(void*);
+int loop_task(int);
 
-int send_static_content(int, const char*, char*, char*, char*, unsigned char);
+int transfer_static_file(int, const char*, char*, char*, char*, unsigned char);
 
-int send_dynamic_content(int, char*, char*, char*, char**, char* const[]);
+int execute_cgi_bin(int, char*, char*, char*, char**, char* const[]);
 
 int parse_uri_get(char*, char*, char**, char**);
 
