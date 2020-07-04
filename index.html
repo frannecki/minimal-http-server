@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head lang="zh">
+	<meta charset="UTF-8" />
+	<title>Read Text File</title>
+	<!--script type="text/javascript" src="index.js"></script-->
+</head>
+<body>
+	<input type="file" onchange="showFileContent(this)">
+	<textarea style="resize: none" id="ta"></textarea>
+	<p id="text_field"></p>
+	<script type="text/javascript">
+		function showFileContent(input){
+			var reader = new FileReader();
+			reader.onload = function(e){
+				let par = document.getElementById('text_field');
+				par.innerHTML = e.target.result;
+			}
+			reader.readAsText(input.files[0]);
+		}
+	</script>
+	<video src="legal-high.mp4" width="50%" controls="controls"></video>
+</body>
+</html>

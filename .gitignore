@@ -1,0 +1,5 @@
+/bin
+/cgi-bin
+/files
+*.ico
+/webpages/example

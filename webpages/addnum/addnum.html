@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>Add Two Integers</title>
+        <script type="text/javascript">
+            function add_numbers(){
+                var form = document.getElementById("form_add_num");
+                var httpRequest = new XMLHttpRequest();
+                httpRequest.open('POST', '/cgi-bin/addnum', 'true');
+                httpRequest.setRequestHeader("Content-Type","application/x-www-form-urlencoded");
+                var num1 = "figure1=" + form.figure1.value;
+                var num2 = "figure2=" + form.figure2.value;
+                httpRequest.send(num1 + "&" + num2);
+                httpRequest.onreadystatechange = () => {
+                    // this refers to the method owner in function() but not in arrow functions
+                    console.log('readyState = ' + httpRequest.readyState + '\nstatus = ' + httpRequest.status);
+                    if(httpRequest.readyState == 4 && httpRequest.status == 200){
+                        form.result.value = httpRequest.responseText;
+                    }
+                };
+            }
+        </script>
+        <link rel="stylesheet" href="addnum.css" type="text/css" > 
+    </head>
+    <body>
+        <div id="container">
+            <h2>Please Input The Two Integers</h2><br/>
+            <form name="form_add_num" id="form_add_num" method="POST">
+                Figure1: <input type="text" name="figure1"><br/><br/>
+                Figure2: <input type="text" name="figure2"><br/><br/>
+                <input type="button" value="Calculate" onclick="add_numbers()"><br/><br/>
+                Result: <input type="text" name="result">
+            </form>
+        </div>
+    </body>
+</html>
