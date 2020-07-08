@@ -184,8 +184,12 @@ int execute_cgi_bin(int fd, char* filename, char* query,
         return -1;
     }
     else if(pid == 0){
-        dup2(fd, STDOUT_FILENO);
+        int saved_output = dup(1);
+        dup2(fd, 1);
         execve(filename, argvlist, environs);
+        close(fd);
+        dup2(saved_output, 1);
+        close(saved_output);
         exit(0);
     }
     else{
