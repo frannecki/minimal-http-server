@@ -34,6 +34,8 @@ int startswithstr(const char*, const char*);
 
 int endswithstr(const char*, const char*);
 
-int find_str_kmp(const char* str, const char* pat);
+static int find_str_kmp(const char* str, const char* pat);
+
+static void sig_chld_handler(int);
 
 #endif

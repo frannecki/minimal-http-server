@@ -20,7 +20,7 @@ int loop_task(int fd){
     char method[MAXMETVERLEN];
     char uri[MAXURILEN];
     char version[MAXMETVERLEN];
-    char* const environs[] = {NULL};        // environ list for cgi executables
+    extern char** environ;        // environ list for cgi executables
     char* argvlist[] = {NULL, NULL, NULL};      // argv list for cgi executables
     char filetype[MAXFILETYPELEN];      // static file type
     char resp_status[MAXSTATUSLEN];     // http request status
@@ -57,7 +57,7 @@ int loop_task(int fd){
         }
         else if(ret == 1){
             // dynamic
-            execute_cgi_bin(fd, filename, query_str, resp_status, argvlist, environs);
+            execute_cgi_bin(fd, filename, query_str, resp_status, argvlist, environ);
         }
     }
     else if(0 == strcasecmp(method, "POST")){
@@ -68,7 +68,7 @@ int loop_task(int fd){
         snprintf(req_header, offset2-offset1-3+1, "%s", request+offset1+3);
         sscanf(request+offset2+4, "%[^\a]", req_text);
         fprintf(stdout, "Request Text: %s\n", req_text);
-        execute_cgi_bin(fd, uri+1, req_text, resp_header, argvlist, environs);
+        execute_cgi_bin(fd, uri+1, req_text, resp_header, argvlist, environ);
     }
     else if(0 == strcmp(method, "HEAD")){
         // HEAD method
@@ -171,7 +171,7 @@ int transfer_static_file(int fd, const char* filename, char* resp_status,
 
 
 int execute_cgi_bin(int fd, char* filename, char* query, 
-        char* resp_header, char** argvlist, char* const environs[])
+        char* resp_header, char** argvlist, char* const environ[])
 {
     char tmp[30];
     int pid;
@@ -179,6 +179,7 @@ int execute_cgi_bin(int fd, char* filename, char* query,
     argvlist[1] = (strlen(query)>0)?query:NULL;
     strcpy(resp_header, "HTTP/1.0 200 OK\r\nConnection: close\r\nServer: TWS\r\nContent-Type: text/plain\r\n\r\n");
     write(fd, resp_header, strlen(resp_header));
+    signal(SIGCHLD, sig_chld_handler);
     if((pid = fork()) < 0){
         perror("fork()");
         return -1;
@@ -186,14 +187,14 @@ int execute_cgi_bin(int fd, char* filename, char* query,
     else if(pid == 0){
         int saved_output = dup(1);
         dup2(fd, 1);
-        execve(filename, argvlist, environs);
+        execve(filename, argvlist, environ);
         close(fd);
         dup2(saved_output, 1);
         close(saved_output);
         exit(0);
     }
     else{
-        wait(NULL);
+        pause();
     }
     return 0;
 }
@@ -239,7 +240,7 @@ int endswithstr(const char* str, const char* sub){
 }
 
 
-int find_str_kmp(const char* str, const char* pat){
+static int find_str_kmp(const char* str, const char* pat){
     int len1 = strlen(str);
     int len2 = strlen(pat);
     int* next = (int*)malloc((1+len2)*sizeof(int));
@@ -268,4 +269,12 @@ int find_str_kmp(const char* str, const char* pat){
     if(j == len2)  return i-len2;
     else  return -1;
     free(next);
+}
+
+
+static void sig_chld_handler(int sig){
+    pid_t pid;
+    int status;
+    // waiting for any child processes
+    while((pid = waitpid(-1, &status, WNOHANG)) != -1);
 }
