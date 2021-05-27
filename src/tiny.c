@@ -78,7 +78,14 @@ int loop_task(int fd){
         // 400 bad request
         fprintf(stderr, "The method '%s' is not currently supported.\n", method);
         sprintf(resp_status, "HTTP/1.0 400 Bad Request\n");
-        write(fd, resp_status, strlen(resp_status));
+        if((ret = write(fd, resp_status, strlen(resp_status))) < 0) {
+            perror("write()");
+            close(fd);
+            return -1;
+        }
+        else {
+            fprintf(stdout, "Written %d bytes.\n", ret);
+        }
         close(fd);
         return -3;
     }
@@ -173,8 +180,9 @@ int transfer_static_file(int fd, const char* filename, char* resp_status,
 int execute_cgi_bin(int fd, char* filename, char* query, 
         char* resp_header, char** argvlist, char* const environ[])
 {
+    int ret;
     char tmp[30];
-    int pid;
+    pid_t pid;
     argvlist[0] = filename;
     argvlist[1] = (strlen(query)>0)?query:NULL;
     strcpy(resp_header, "HTTP/1.0 200 OK\r\nConnection: close\r\nServer: TWS\r\nContent-Type: text/plain\r\n\r\n");
@@ -192,9 +200,6 @@ int execute_cgi_bin(int fd, char* filename, char* query,
         dup2(saved_output, 1);
         close(saved_output);
         exit(0);
-    }
-    else{
-        pause();
     }
     return 0;
 }
